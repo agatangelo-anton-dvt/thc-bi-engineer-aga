@@ -8,7 +8,7 @@ WITH history AS (
             ORDER BY unix_date(date_date) 
             RANGE BETWEEN 365 PRECEDING AND 1 PRECEDING
         ) as orders_last_12_months
-    FROM {{ source('raw_data', 'stg_orders_reclutement') }}
+    FROM {{ source('raw_data', 'orders_reclutement') }}
 )
 
 SELECT
