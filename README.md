@@ -56,9 +56,3 @@ The code is in the "forecast" folder in this repository:
 2. **Model & Training**
 3. **Prediction:** The `forecast` model generates a **182-day outlook** with confidence intervals, unioned with historical data for seamless visualization.
 
-
-SELECT * FROM actual_data
-UNION ALL
-SELECT * FROM forecast_data
-ORDER BY date_date ASC;
-
