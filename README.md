@@ -49,19 +49,56 @@ A final table for 2023 orders that includes the specific segmentation (**New**, 
 
 ## 🚀 Advanced Feature: Sales Forecasting
 
-In addition to the core exercises, a forecasting module was implemented using **BigQuery ML** to provide predictive insights.
+I had some trouble implementing the forecast with dbt and did it directly in BigQuery to avoid errors since I don't have much experience with dbt.
 
-1.  **Training:** The `create_training_model` model uses a `post_hook` to train an `ARIMA_PLUS` model on historical daily net sales.
-2.  **Prediction:** The `forecast` model generates a **30-day outlook** with confidence intervals, unioned with historical data for seamless visualization.
+1.  **New table with correct format for forecasting:**
+CREATE OR REPLACE TABLE `agatangelo-anton-sandbox1.forecast_astrafy.stg_forecast_input` AS
+SELECT
+    CAST(date_date AS TIMESTAMP) as ds,
+    SUM(net_sales) as total_sales
+FROM `agatangelo-anton-sandbox1.raw_data.sales_reclutement`
+GROUP BY 1;
 
----
 
-## ⚙️ Setup and Execution
+3.  **Model & Training:**
+CREATE OR REPLACE MODEL `agatangelo-anton-sandbox1.forecast_astrafy.sales_forecast_model`
+OPTIONS(
+  model_type='ARIMA_PLUS',
+  time_series_timestamp_col='ds',
+  time_series_data_col='total_sales',
+  auto_arima=TRUE,
+  data_frequency='DAILY',
+  holiday_region='ES'
+) AS
+SELECT ds, total_sales FROM `agatangelo-anton-sandbox1.forecast_astrafy.stg_forecast_input`;
 
-### 1. Profiles
-Ensure your `profiles.yml` is configured to connect to the BigQuery dataset: 
-`agatangelo-anton-sandbox1`.
 
-### 2. Install dependencies
-```bash
-dbt deps
+4.  **Prediction:** The `forecast` model generates a **182-day outlook** with confidence intervals, unioned with historical data for seamless visualization.
+CREATE OR REPLACE TABLE `agatangelo-anton-sandbox1.forecast_astrafy.exercise_forecast` AS
+WITH forecast_data AS (
+    SELECT
+        CAST(forecast_timestamp AS DATE) as date_date,
+        forecast_value as net_sales,
+        prediction_interval_lower_bound as lower_bound,
+        prediction_interval_upper_bound as upper_bound,
+        'forecast' as type
+    FROM
+        ML.FORECAST(MODEL `agatangelo-anton-sandbox1.forecast_astrafy.sales_forecast_model`,
+                    STRUCT(182 AS horizon, 0.9 AS confidence_level))
+),
+actual_data AS (
+    SELECT
+        CAST(ds AS DATE) as date_date,
+        total_sales as net_sales,
+        total_sales as lower_bound,
+        total_sales as upper_bound,
+        'actual' as type
+    FROM `agatangelo-anton-sandbox1.forecast_astrafy.stg_forecast_input`
+)
+
+
+SELECT * FROM actual_data
+UNION ALL
+SELECT * FROM forecast_data
+ORDER BY date_date ASC;
+
